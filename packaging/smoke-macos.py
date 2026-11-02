@@ -39,6 +39,11 @@ try:
     assert service_pid() == pid, "Second launch created another server"
     assert (app / "Contents/Resources/anyloc/web/index.html").is_file()
     print("PASS: bundled server, web UI, resources and repeat launch")
+except Exception:
+    log = Path.home() / "Library/Logs/AnyLoc/server.log"
+    if log.exists():
+        print(log.read_text(errors="replace")[-16000:], file=sys.stderr)
+    raise
 finally:
     if pid is not None:
         os.kill(pid, signal.SIGTERM)

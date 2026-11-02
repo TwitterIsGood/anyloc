@@ -27,7 +27,8 @@ def _find_port(start: int = 8787) -> int:
 
 def _probe_server(port: int) -> bool:
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=0.35) as response:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(f"http://127.0.0.1:{port}/api/status", timeout=0.35) as response:
             data = response.read(4096)
         status = json.loads(data)
         return isinstance(status, dict) and "keepalive_seconds" in status and "route_playing" in status
@@ -42,9 +43,11 @@ def _find_existing_server(start: int = 8787) -> int | None:
     return None
 
 
-def _wait_for_server(port: int, timeout: float = 15.0) -> bool:
+def _wait_for_server(port: int, timeout: float = 45.0, child: subprocess.Popen | None = None) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
+        if child is not None and child.poll() is not None:
+            return False
         if _probe_server(port):
             return True
         time.sleep(0.2)
@@ -97,8 +100,10 @@ def main() -> None:
     port = _find_port(requested)
     url = f"http://127.0.0.1:{port}/"
     child = _launch_server(port)
-    if not _wait_for_server(port):
-        child.terminate()
+    if not _wait_for_server(port, child=child):
+        if child.poll() is None:
+            child.terminate()
+            child.wait(timeout=5)
         raise RuntimeError(f"AnyLoc 服务启动失败，详见 ~/Library/Logs/AnyLoc/server.log（端口 {port}）")
     if os.environ.get("ANYLOC_NO_OPEN") != "1":
         webbrowser.open(url)
