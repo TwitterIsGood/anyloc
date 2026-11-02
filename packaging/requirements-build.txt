@@ -1,0 +1,5 @@
+pymobiledevice3==11.49.0
+fastapi==0.162.0
+uvicorn==0.54.0
+typer==0.27.3
+pyinstaller==6.22.3

@@ -9,5 +9,5 @@ AnyLoc USB 模拟定位
 
 再次双击 AnyLoc 会重新打开已有网页，不会重复连接设备。
 
-要求：macOS Apple Silicon、iOS 17+、USB 连接、已配对并开启开发者模式的 iPhone。
+要求：macOS（Apple Silicon / Intel，选择对应安装包）、iOS 17+、USB 连接、已配对并开启开发者模式的 iPhone。
 地图需要网络访问 Leaflet 和 OpenStreetMap 资源。

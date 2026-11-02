@@ -1,4 +1,5 @@
 # PyInstaller build description for the standalone macOS app.
+import os
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
@@ -57,5 +58,5 @@ app = BUNDLE(
     name="AnyLoc.app",
     icon=None,
     bundle_identifier="com.bicy.anyloc.mac",
-    version="0.1.0",
+    version=os.environ.get("ANYLOC_VERSION", "0.1.0"),
 )
