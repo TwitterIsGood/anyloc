@@ -43,7 +43,8 @@ jobs:
       - name: Install Python and build dependencies
         run: |
           test "$(uname -m)" = "${{ matrix.arch }}"
-          uv venv --python 3.12 .venv
+          uv python install 3.12
+          uv venv --managed-python --python 3.12 .venv
           uv pip install --python .venv/bin/python -e . -r packaging/requirements-build.txt
       - name: Set version
         env:
