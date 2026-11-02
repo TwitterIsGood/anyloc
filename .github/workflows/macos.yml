@@ -45,7 +45,7 @@ jobs:
           test "$(uname -m)" = "${{ matrix.arch }}"
           uv python install 3.12
           uv venv --managed-python --python 3.12 .venv
-          uv pip install --python .venv/bin/python -e . -r packaging/requirements-build.txt
+          uv pip install --python .venv/bin/python --only-binary cryptography -e . -r packaging/requirements-build.txt
       - name: Set version
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
