@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AnyLoc</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="preconnect" href="https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --ink: #132033;
+      --muted: #728198;
+      --line: rgba(216, 228, 242, .85);
+      --glass: rgba(255, 255, 255, .89);
+      --glass-strong: rgba(255, 255, 255, .97);
+      --blue: #1769e0;
+      --blue-2: #0a8fe8;
+      --green: #08a77a;
+      --green-dark: #087a5c;
+      --red: #da4b4b;
+      --shadow: 0 20px 60px rgba(18, 46, 81, .16);
+      --shadow-soft: 0 10px 30px rgba(18, 46, 81, .10);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    html, body, #map { width: 100%; height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #edf3f9;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, select, input { font: inherit; }
+    button { cursor: pointer; }
+    .glass {
+      background: var(--glass);
+      border: 1px solid rgba(255,255,255,.8);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px) saturate(1.25);
+    }
+    #map { position: fixed; inset: 0; background: #dfeaf2; }
+    .leaflet-control-attribution { font-size: 10px !important; }
+    .leaflet-top.leaflet-left { top: auto; bottom: 118px; }
+    .leaflet-control-zoom { margin: 0 0 0 18px !important; }
+    .leaflet-control-zoom a { border: 0 !important; color: var(--ink) !important; }
+    .leaflet-control-zoom { border: 1px solid rgba(255,255,255,.9) !important; border-radius: 12px !important; overflow: hidden; box-shadow: var(--shadow-soft) !important; }
+
+    .brand-card {
+      position: fixed;
+      z-index: 900;
+      top: 18px;
+      left: 18px;
+      width: 344px;
+      border-radius: var(--radius);
+      padding: 18px;
+      transition: width .2s ease;
+    }
+    .brand-head { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 46px;
+      height: 46px;
+      border-radius: 15px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 23px;
+      font-weight: 800;
+      background: linear-gradient(145deg, #1769e0, #08b18b);
+      box-shadow: 0 12px 28px rgba(23,105,224,.30);
+      flex: 0 0 auto;
+    }
+    .brand-title { min-width: 0; flex: 1; }
+    .brand-title h1 { margin: 0; font-size: 20px; letter-spacing: -.03em; }
+    .brand-title p { margin: 3px 0 0; font-size: 12px; color: var(--muted); }
+    .connection-pill {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 11px;
+      font-weight: 750;
+      background: #eef3f8;
+      color: #66768d;
+    }
+    .connection-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .65; }
+    .connection-pill.online { background: #e4f8ef; color: #087b5c; }
+    .connection-pill.warn { background: #fff0e4; color: #b96813; }
+    .connection-pill.error { background: #ffebeb; color: #b72e2e; }
+
+    .device-line {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 86px;
+      gap: 8px;
+    }
+    .field {
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.82);
+      border-radius: 13px;
+      padding: 10px 12px;
+      min-width: 0;
+      outline: none;
+      color: var(--ink);
+      font-size: 13px;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    select.field, input.field { width: 100%; }
+    .field:focus { border-color: #8eb9ff; box-shadow: 0 0 0 3px rgba(23,105,224,.11); }
+    .field:disabled { opacity: .55; }
+    .device-meta { margin-top: 8px; font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+    .device-meta strong { color: #39516d; font-weight: 650; }
+
+    .connect-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 8px; margin-top: 10px; }
+    .primary-btn, .secondary-btn, .ghost-btn, .danger-btn {
+      border: 0;
+      border-radius: 13px;
+      min-height: 43px;
+      padding: 0 15px;
+      font-size: 13px;
+      font-weight: 720;
+      transition: transform .08s, opacity .15s, box-shadow .15s;
+    }
+    .primary-btn:active, .secondary-btn:active, .ghost-btn:active, .danger-btn:active { transform: translateY(1px); }
+    .primary-btn { color: white; background: linear-gradient(135deg, var(--blue), var(--blue-2)); box-shadow: 0 10px 24px rgba(23,105,224,.23); }
+    .secondary-btn { color: white; background: linear-gradient(135deg, #07a77c, #24c18d); box-shadow: 0 10px 24px rgba(8,167,122,.20); }
+    .ghost-btn { color: #425873; background: #eef3f8; }
+    .danger-btn { color: #b92f2f; background: #ffeded; }
+    .icon-btn { min-height: 43px; padding: 0; border: 0; border-radius: 13px; color: #4e627a; background: #eef3f8; font-size: 18px; }
+    .primary-btn:disabled, .secondary-btn:disabled, .ghost-btn:disabled, .danger-btn:disabled, .icon-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    .dev-banner {
+      display: none;
+      margin-top: 11px;
+      border-radius: 13px;
+      padding: 10px 12px;
+      background: #fff7e9;
+      border: 1px solid #ffe0ad;
+      color: #8a5b14;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+    .dev-banner.show { display: block; }
+    .dev-banner button { border: 0; background: transparent; color: #95610f; font-weight: 750; padding: 4px 0 0; }
+
+    .status-line { display: none; margin-top: 9px; font-size: 11px; color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
+    .status-line.show { display: block; }
+    .status-line.error { color: var(--red); }
+
+    .map-instruction {
+      position: fixed;
+      z-index: 600;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 12px;
+      color: #455a73;
+      background: rgba(255,255,255,.90);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(16px);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .map-instruction b { color: var(--ink); }
+    .route-toggle {
+      position: fixed;
+      z-index: 700;
+      top: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      border: 0;
+      border-radius: 16px;
+      background: var(--glass-strong);
+      box-shadow: var(--shadow-soft);
+      color: #39516d;
+      font-size: 22px;
+    }
+
+    .route-drawer {
+      position: fixed;
+      z-index: 950;
+      top: 82px;
+      right: 20px;
+      width: 322px;
+      max-height: calc(100vh - 192px);
+      border-radius: var(--radius);
+      padding: 18px;
+      transform: translateX(calc(100% + 34px));
+      opacity: 0;
+      transition: transform .25s cubic-bezier(.2,.7,.2,1), opacity .2s ease;
+      display: flex;
+      flex-direction: column;
+    }
+    .route-drawer.open { transform: translateX(0); opacity: 1; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .drawer-head h2 { font-size: 16px; margin: 0; letter-spacing: -.02em; }
+    .drawer-head button { border: 0; background: #eef3f8; color: #536981; width: 30px; height: 30px; border-radius: 10px; }
+    .drawer-copy { margin: 8px 0 12px; font-size: 11px; line-height: 1.55; color: var(--muted); }
+    .route-list {
+      min-height: 72px;
+      max-height: 210px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.72);
+    }
+    .route-empty { padding: 19px 12px; text-align: center; color: var(--muted); font-size: 11px; }
+    .route-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px; border-bottom: 1px solid #edf2f7; font-size: 11px; }
+    .route-row:last-child { border-bottom: 0; }
+    .route-row span { color: #475d77; font-variant-numeric: tabular-nums; }
+    .route-row button { border: 0; background: transparent; color: #c34848; font-size: 16px; line-height: 1; }
+    .route-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .route-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+    .sim-dock {
+      position: fixed;
+      z-index: 800;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%);
+      width: min(540px, calc(100vw - 40px));
+      border-radius: 24px;
+      padding: 15px 16px 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .sim-copy { min-width: 0; }
+    .sim-kicker { font-size: 10px; text-transform: uppercase; letter-spacing: .10em; color: #8190a4; font-weight: 750; }
+    .sim-title { margin-top: 4px; font-size: 15px; font-weight: 760; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sim-coord { margin-top: 3px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .sim-dock .secondary-btn { min-width: 126px; }
+    .restore-btn { width: 46px; min-width: 46px; padding: 0; }
+
+    .toast {
+      position: fixed;
+      z-index: 1200;
+      left: 50%;
+      bottom: 112px;
+      transform: translate(-50%, 8px);
+      border-radius: 999px;
+      padding: 10px 16px;
+      color: white;
+      background: rgba(17,31,48,.90);
+      box-shadow: var(--shadow-soft);
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+      max-width: calc(100vw - 40px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .toast.error { background: rgba(173,45,45,.94); }
+    .toast.success { background: rgba(5,119,86,.94); }
+
+    .pin {
+      width: 28px;
+      height: 28px;
+      border-radius: 50% 50% 50% 8px;
+      transform: rotate(-45deg);
+      background: linear-gradient(145deg, #1769e0, #0b91e4);
+      border: 3px solid white;
+      box-shadow: 0 8px 20px rgba(23,105,224,.35);
+    }
+    .sim-pin {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #08a77a;
+      border: 3px solid white;
+      box-shadow: 0 0 0 9px rgba(8,167,122,.17), 0 8px 18px rgba(8,122,92,.30);
+      animation: pulse 2.2s ease-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 5px rgba(8,167,122,.17), 0 8px 18px rgba(8,122,92,.30); }
+      50% { box-shadow: 0 0 0 13px rgba(8,167,122,.08), 0 8px 18px rgba(8,122,92,.30); }
+    }
+
+    @media (max-width: 860px) {
+      .brand-card { width: calc(100vw - 36px); }
+      .map-instruction { top: auto; bottom: 112px; max-width: calc(100vw - 40px); overflow: hidden; text-overflow: ellipsis; }
+      .sim-dock { grid-template-columns: minmax(0, 1fr) auto; }
+      .sim-dock .secondary-btn { grid-column: 1 / -1; width: 100%; }
+      .route-drawer { top: 82px; left: 18px; right: 18px; width: auto; }
+      .leaflet-top.leaflet-left { bottom: 176px; }
+    }
+    @media (max-width: 500px) {
+      .brand-card { top: 10px; left: 10px; width: calc(100vw - 20px); padding: 14px; }
+      .map-instruction { display: none; }
+      .sim-dock { bottom: 10px; width: calc(100vw - 20px); }
+      .route-toggle { top: 10px; right: 10px; }
+      .route-drawer { top: 70px; left: 10px; right: 10px; max-height: calc(100vh - 260px); }
+    }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+
+<section class="brand-card glass">
+  <div class="brand-head">
+    <div class="logo">A</div>
+    <div class="brand-title">
+      <h1>AnyLoc</h1>
+      <p>在地图上选择你要模拟的位置</p>
+    </div>
+    <span class="connection-pill" id="connectionPill">未连接</span>
+  </div>
+
+  <div class="device-line">
+    <select class="field" id="deviceSelect" aria-label="设备"></select>
+    <button class="icon-btn" id="refreshBtn" title="刷新设备">↻</button>
+  </div>
+  <div class="device-meta" id="deviceMeta">正在查找设备…</div>
+
+  <div class="connect-row">
+    <button class="primary-btn" id="connectBtn">连接设备</button>
+    <select class="field" id="connectionType" aria-label="连接方式">
+      <option value="USB">USB</option>
+      <option value="Network">WiFi</option>
+    </select>
+  </div>
+
+  <div class="dev-banner" id="devBanner">
+    开发者模式未开启，DVT 定位不可用。
+    <button id="revealDevModeBtn">显示开发者模式开关</button>
+  </div>
+  <div class="status-line" id="statusLine"></div>
+</section>
+
+<div class="map-instruction" id="mapInstruction">点击地图选择位置，<b>再点底部“设为模拟定位”</b></div>
+<button class="route-toggle" id="routeToggle" title="路线">⌁</button>
+
+<aside class="route-drawer glass" id="routeDrawer">
+  <div class="drawer-head">
+    <h2>模拟路线</h2>
+    <button id="routeClose" title="关闭">×</button>
+  </div>
+  <p class="drawer-copy">在地图上选点后添加为路线点。开始播放后，设备会按间隔依次移动。</p>
+  <div class="route-list" id="routeList"><div class="route-empty">还没有路线点</div></div>
+  <div class="route-controls">
+    <input class="field" id="routeInterval" type="number" min="50" max="60000" step="50" value="300" aria-label="路线间隔">
+    <select class="field" id="routeLoop" aria-label="循环">
+      <option value="false">单次</option>
+      <option value="true">循环</option>
+    </select>
+  </div>
+  <div class="route-actions">
+    <button class="ghost-btn" id="addRoutePoint">添加当前点</button>
+    <button class="ghost-btn" id="clearRoute">清空</button>
+    <button class="secondary-btn" id="playRoute">播放</button>
+    <button class="danger-btn" id="stopRoute">停止</button>
+  </div>
+</aside>
+
+<section class="sim-dock glass">
+  <div class="sim-copy">
+    <div class="sim-kicker">所选位置</div>
+    <div class="sim-title" id="selectedTitle">在北京地图上选择一个点</div>
+    <div class="sim-coord" id="selectedCoord">39.904200, 116.407400</div>
+  </div>
+  <button class="secondary-btn" id="simulateBtn">设为模拟定位</button>
+  <button class="danger-btn restore-btn" id="restoreBtn" title="恢复真实定位">↺</button>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    map: null,
+    selected: { lat: 39.9042, lng: 116.4074 },
+    selectedMarker: null,
+    activeMarker: null,
+    route: [],
+    routeLayer: null,
+    connected: false,
+    status: null,
+    devices: [],
+    autoConnectTried: false,
+    userTouchedSelection: false,
+    toastTimer: null,
+  };
+
+  const fmt = (n) => Number(n).toFixed(6);
+
+  const api = async (path, options = {}) => {
+    const response = await fetch(path, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    const text = await response.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = { detail: text }; }
+    if (!response.ok) {
+      const detail = data?.detail;
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail || text || response.statusText));
+    }
+    return data;
+  };
+
+  const toast = (message, kind = "success") => {
+    const el = $("toast");
+    el.textContent = message;
+    el.className = `toast show ${kind}`;
+    clearTimeout(state.toastTimer);
+    state.toastTimer = setTimeout(() => { el.className = "toast"; }, 3200);
+  };
+
+  const setStatusLine = (text = "", error = false) => {
+    const el = $("statusLine");
+    el.textContent = text;
+    el.className = `status-line ${text ? "show" : ""} ${error ? "error" : ""}`;
+  };
+
+  const icon = (cls) => L.divIcon({
+    className: "",
+    html: `<div class="${cls}"></div>`,
+    iconSize: cls === "pin" ? [28, 28] : [18, 18],
+    iconAnchor: cls === "pin" ? [14, 27] : [9, 9],
+  });
+
+  const placeSelected = (lat, lng, pan = false) => {
+    state.selected = { lat: Number(lat), lng: Number(lng) };
+    $("selectedCoord").textContent = `${fmt(lat)}, ${fmt(lng)}`;
+    $("selectedTitle").textContent = "设为这个模拟位置";
+    if (!state.map) return;
+    if (!state.selectedMarker) {
+      state.selectedMarker = L.marker([lat, lng], { icon: icon("pin"), draggable: true }).addTo(state.map);
+      state.selectedMarker.on("dragend", () => {
+        state.userTouchedSelection = true;
+        const p = state.selectedMarker.getLatLng();
+        placeSelected(p.lat, p.lng);
+      });
+    } else {
+      state.selectedMarker.setLatLng([lat, lng]);
+    }
+    if (pan) state.map.panTo([lat, lng], { animate: true });
+  };
+
+  const placeActive = (lat, lng) => {
+    if (!state.map) return;
+    if (!state.activeMarker) {
+      state.activeMarker = L.marker([lat, lng], { icon: icon("sim-pin"), interactive: false }).addTo(state.map);
+    } else {
+      state.activeMarker.setLatLng([lat, lng]);
+    }
+  };
+
+  const clearActive = () => {
+    if (state.activeMarker && state.map) state.map.removeLayer(state.activeMarker);
+    state.activeMarker = null;
+  };
+
+  const renderConnection = (status) => {
+    state.status = status;
+    state.connected = !!status.connected;
+    const pill = $("connectionPill");
+    if (status.connected) {
+      pill.textContent = "已连接";
+      pill.className = "connection-pill online";
+    } else if (status.last_error) {
+      pill.textContent = "连接异常";
+      pill.className = "connection-pill error";
+    } else {
+      pill.textContent = "未连接";
+      pill.className = "connection-pill";
+    }
+    $("connectBtn").textContent = status.connected ? "重新连接" : "连接设备";
+    $("connectBtn").disabled = false;
+    $("deviceSelect").disabled = false;
+    $("connectionType").disabled = false;
+
+    const dev = status.developer_mode;
+    $("devBanner").classList.toggle("show", dev === false);
+    if (status.last_error) setStatusLine(status.last_error, true);
+    else setStatusLine("");
+
+    if (status.last_location) {
+      if (!state.userTouchedSelection) {
+        placeSelected(status.last_location.latitude, status.last_location.longitude, true);
+      }
+      placeActive(status.last_location.latitude, status.last_location.longitude);
+      if (!state.userTouchedSelection) $("selectedTitle").textContent = "正在模拟此位置";
+    } else {
+      clearActive();
+    }
+  };
+
+  const refreshStatus = async () => {
+    try {
+      renderConnection(await api("/api/status"));
+    } catch (error) {
+      setStatusLine(error.message, true);
+    }
+  };
+
+  const refreshDevices = async () => {
+    setStatusLine("正在刷新设备…");
+    try {
+      const devices = await api("/api/devices");
+      state.devices = devices;
+      const select = $("deviceSelect");
+      select.innerHTML = "";
+      if (!devices.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "没有检测到设备";
+        select.appendChild(option);
+        $("deviceMeta").textContent = "请用 USB 连接 iPhone，并信任此电脑";
+        return;
+      }
+      for (const device of devices) {
+        const option = document.createElement("option");
+        option.value = device.udid;
+        option.textContent = `${device.name} · iOS ${device.product_version}`;
+        select.appendChild(option);
+      }
+      const preferred = devices.find((d) => d.product_type?.toLowerCase().startsWith("iphone")) || devices[0];
+      select.value = preferred.udid;
+      $("deviceMeta").innerHTML = `<strong>${preferred.trusted ? "已信任" : "待信任"}</strong><span>·</span><span>${preferred.connection_types.join(" / ")}</span>`;
+      setStatusLine("");
+      if (!state.connected && devices.length === 1 && !state.autoConnectTried) {
+        state.autoConnectTried = true;
+        setTimeout(() => connectDevice(true), 250);
+      }
+    } catch (error) {
+      setStatusLine(error.message, true);
+    }
+  };
+
+  const reconnectIfNeeded = () => {
+    if (!state.connected) return;
+    if (state.status?.udid && state.status.udid === $("deviceSelect").value) return;
+    toast("正在切换设备…", "success");
+    connectDevice(false);
+  };
+
+  const connectDevice = async (automatic = false) => {
+    const udid = $("deviceSelect").value;
+    if (!udid) return toast("没有可连接的设备", "error");
+    $("connectBtn").disabled = true;
+    setStatusLine(automatic ? "正在自动连接…" : "正在连接设备…");
+    try {
+      const status = await api("/api/connect", {
+        method: "POST",
+        body: JSON.stringify({
+          udid,
+          mode: "native",
+          connection_type: $("connectionType").value,
+          keepalive_seconds: 25,
+        }),
+      });
+      renderConnection(status);
+      setStatusLine("");
+      toast(automatic ? "设备已自动连接" : "设备连接成功", "success");
+    } catch (error) {
+      $("connectBtn").disabled = false;
+      setStatusLine(error.message, true);
+      toast("连接失败", "error");
+    }
+  };
+
+  const simulateSelected = async () => {
+    const button = $("simulateBtn");
+    button.disabled = true;
+    try {
+      const status = await api("/api/location", {
+        method: "POST",
+        body: JSON.stringify({ latitude: state.selected.lat, longitude: state.selected.lng }),
+      });
+      renderConnection(status);
+      placeActive(state.selected.lat, state.selected.lng);
+      $("selectedTitle").textContent = "正在模拟此位置";
+      toast("模拟定位已生效", "success");
+    } catch (error) {
+      setStatusLine(error.message, true);
+      toast("设置定位失败", "error");
+    } finally {
+      button.disabled = false;
+    }
+  };
+
+  const restoreLocation = async () => {
+    try {
+      renderConnection(await api("/api/clear", { method: "POST" }));
+      clearActive();
+      $("selectedTitle").textContent = "恢复真实定位";
+      toast("已恢复真实定位", "success");
+    } catch (error) {
+      toast("恢复定位失败", "error");
+      setStatusLine(error.message, true);
+    }
+  };
+
+  const renderRoute = () => {
+    const list = $("routeList");
+    list.innerHTML = "";
+    if (!state.route.length) {
+      list.innerHTML = '<div class="route-empty">还没有路线点</div>';
+    } else {
+      state.route.forEach((point, index) => {
+        const row = document.createElement("div");
+        row.className = "route-row";
+        const label = document.createElement("span");
+        label.textContent = `${index + 1}. ${fmt(point.latitude)}, ${fmt(point.longitude)}`;
+        const remove = document.createElement("button");
+        remove.textContent = "×";
+        remove.title = "删除";
+        remove.onclick = () => {
+          state.route.splice(index, 1);
+          renderRoute();
+        };
+        row.append(label, remove);
+        list.appendChild(row);
+      });
+    }
+    if (!state.map) return;
+    if (state.routeLayer) state.map.removeLayer(state.routeLayer);
+    state.routeLayer = null;
+    if (state.route.length > 1) {
+      state.routeLayer = L.polyline(
+        state.route.map((point) => [point.latitude, point.longitude]),
+        { color: "#08a77a", weight: 5, opacity: .88, lineJoin: "round" }
+      ).addTo(state.map);
+    }
+  };
+
+  const addRoutePoint = () => {
+    state.route.push({ latitude: state.selected.lat, longitude: state.selected.lng });
+    renderRoute();
+    toast(`已添加第 ${state.route.length} 个路线点`, "success");
+  };
+
+  const playRoute = async () => {
+    if (!state.route.length) return toast("先添加路线点", "error");
+    try {
+      renderConnection(await api("/api/route", {
+        method: "POST",
+        body: JSON.stringify({
+          points: state.route,
+          interval_ms: Number($("routeInterval").value || 300),
+          loop: $("routeLoop").value === "true",
+        }),
+      }));
+      toast("路线开始播放", "success");
+    } catch (error) {
+      toast("路线播放失败", "error");
+      setStatusLine(error.message, true);
+    }
+  };
+
+  const stopRoute = async () => {
+    try {
+      renderConnection(await api("/api/route/stop", { method: "POST" }));
+      toast("路线已停止", "success");
+    } catch (error) {
+      toast("停止失败", "error");
+    }
+  };
+
+  const revealDeveloperMode = async () => {
+    const udid = $("deviceSelect").value || null;
+    try {
+      const result = await api("/api/developer-mode/reveal", {
+        method: "POST",
+        body: JSON.stringify({ udid }),
+      });
+      toast(result.message, "success");
+      refreshDevices();
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  };
+
+  const initMap = () => {
+    if (!window.L) {
+      $("map").innerHTML = '<div style="padding:30px;color:#65758b">地图加载失败，请检查网络。</div>';
+      return;
+    }
+    const start = [state.selected.lat, state.selected.lng];
+    state.map = L.map("map", { zoomControl: true, attributionControl: true }).setView(start, 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(state.map);
+    placeSelected(start[0], start[1], false);
+    state.map.on("click", (event) => {
+      state.userTouchedSelection = true;
+      placeSelected(event.latlng.lat, event.latlng.lng, false);
+    });
+  };
+
+  $("refreshBtn").onclick = refreshDevices;
+  $("connectBtn").onclick = () => connectDevice(false);
+  $("deviceSelect").onchange = reconnectIfNeeded;
+  $("connectionType").onchange = reconnectIfNeeded;
+  $("simulateBtn").onclick = simulateSelected;
+  $("restoreBtn").onclick = restoreLocation;
+  $("revealDevModeBtn").onclick = revealDeveloperMode;
+  $("routeToggle").onclick = () => $("routeDrawer").classList.toggle("open");
+  $("routeClose").onclick = () => $("routeDrawer").classList.remove("open");
+  $("addRoutePoint").onclick = addRoutePoint;
+  $("clearRoute").onclick = () => { state.route = []; renderRoute(); toast("路线已清空", "success"); };
+  $("playRoute").onclick = playRoute;
+  $("stopRoute").onclick = stopRoute;
+
+  initMap();
+  refreshDevices();
+  refreshStatus();
+  setInterval(refreshStatus, 2000);
+})();
+</script>
+</body>
+</html>
