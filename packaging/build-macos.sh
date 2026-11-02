@@ -14,9 +14,7 @@ if [[ ! -x "$PYTHON" ]]; then
   echo "先运行 README 中的源码安装命令。" >&2
   exit 1
 fi
-if ! "$PYTHON" -c 'import PyInstaller' >/dev/null 2>&1; then
-  uv pip install --python "$PYTHON" -r packaging/requirements-build.txt
-fi
+uv pip install --python "$PYTHON" --only-binary cryptography -r packaging/requirements-build.txt
 
 BUILD_DIR="$(mktemp -d "${TMPDIR:-/tmp/}anyloc-build.XXXXXX")"
 trap '"$PYTHON" -c "import shutil,sys; shutil.rmtree(sys.argv[1])" "$BUILD_DIR"' EXIT

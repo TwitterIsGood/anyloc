@@ -3,3 +3,5 @@ fastapi==0.162.0
 uvicorn==0.54.0
 typer==0.27.3
 pyinstaller==6.22.3
+# Intel wheels bundle OpenSSL and avoid conflicts with sslpsk-pmd3.
+cryptography==46.0.5
